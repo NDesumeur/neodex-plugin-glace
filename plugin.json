@@ -1,0 +1,24 @@
+{
+  "id": "neodex.glace",
+  "name": "Glace",
+  "version": "1.0.0",
+  "author": "NDesumeur",
+  "description": "Glace, un casse-tête en pixel art : sur la glace, le pingouin glisse jusqu'au prochain rocher. Trouve le chemin jusqu'au drapeau en le moins de coups possible. 60 niveaux tous vérifiés faisables, de la neige qui arrête net, des étoiles pour le plus court chemin, un indice si tu bloques. Clavier, souris ou manette.",
+  "icon": "icon.png",
+  "entry": "index.js",
+  "view": "glace",
+  "neobase": ">=4.0.0",
+  "type": "app",
+  "category": "Jeux",
+  "compatibility": ["windows", "linux"],
+  "syncMode": "progression",
+  "syncInfo": "Niveaux et étoiles.",
+  "gamepad": true,
+  "mobile": false,
+  "system": false,
+  "dependencies": {},
+  "sdk": "2.1.0",
+  "permissions": [
+    "storage"
+  ]
+}

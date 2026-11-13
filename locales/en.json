@@ -1,0 +1,21 @@
+{
+ "Glace": "Ice",
+ "GLACE": "ICE",
+ "RECORDS": "RECORDS",
+ "RECOMMENCER": "RESTART",
+ "Flèches : glisser · Retour arrière : annuler · R : recommencer · H : indice · P : pause": "Arrows: slide · Backspace: undo · R: restart · H: hint · P: pause",
+ "Sur la glace, le pingouin ne s'arrête pas : il glisse jusqu'au prochain rocher ou jusqu'au bord. La neige l'arrête net. Amène-le sur le drapeau. Trois étoiles si tu trouves le plus court chemin, deux s'il te faut deux coups de plus. Un indice montre le bon coup, mais la partie ne vaut plus qu'une étoile.": "On ice, the penguin cannot stop: it slides to the next rock or to the edge. Snow stops it dead. Get it to the flag. Three stars if you find the shortest path, two if you need two more moves. A hint shows the right move, but the level is then worth one star.",
+ "Niveau atteint": "Level reached",
+ "Étoiles": "Stars",
+ "Coups joués": "Moves played",
+ "Niveau ": "Level ",
+ " coups · meilleur : ": " moves · best: ",
+ "PAUSE": "PAUSE",
+ "Entrée : reprendre": "Enter: resume",
+ "BRAVO !": "WELL DONE!",
+ " coups (le plus court : ": " moves (shortest: ",
+ "Entrée : niveau suivant": "Enter: next level",
+ "Tu as fini les ": "You finished all ",
+ " niveaux !": " levels!",
+ "Ce plugin doit être approuvé par NeoDex pour s'ouvrir.": "This plugin must be approved by NeoDex to open."
+}
