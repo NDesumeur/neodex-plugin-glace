@@ -5,13 +5,15 @@ const HTML = `<div class="appWrap wide">
   <div class="gMain"><div class="gameBox"><canvas id="glCanvas" width="240" height="136" role="img" aria-label="Glace"></canvas></div>
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="glStats"></div></div>
-      <div class="row"><button class="btn main" id="glNew">RECOMMENCER</button><button class="btn" id="glPrev">◀</button><button class="btn" id="glNext">▶</button></div>
-      <div class="hint">Sur la glace, le pingouin ne s'arrête pas : il glisse jusqu'au prochain rocher ou jusqu'au bord. La neige l'arrête net. Amène-le sur le drapeau. Trois étoiles si tu trouves le plus court chemin, deux s'il te faut deux coups de plus. Un indice montre le bon coup, mais la partie ne vaut plus qu'une étoile.</div>
+      <div class="row"><button class="btn main" id="glNew">RECOMMENCER</button><button class="btn" id="glPrev">◀</button><button class="btn" id="glNext">▶</button><button class="btn" id="glFs">PLEIN ÉCRAN</button></div>
+      <div class="hint">Sur la glace, le pingouin ne s'arrête pas : il glisse jusqu'au prochain rocher ou jusqu'au bord. La neige l'arrête net. Amène-le sur le drapeau. Trois étoiles si tu trouves le plus court chemin, deux s'il te faut deux coups de plus. Un indice montre le bon coup, mais la partie ne vaut plus qu'une étoile. Après le niveau 60 : la glace fissurée casse quand tu la quittes (l'eau t'arrête ensuite), les tas de neige se poussent et glissent à leur tour, les téléporteurs t'envoient de l'un à l'autre.</div>
     </div></div>
 </div>`;
 const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
 .gameBox{display:grid;place-items:center;padding:10px;background:#05010b;flex:0 0 auto;position:relative}
-.gameBox canvas{height:min(72vh,560px);width:auto;aspect-ratio:240/136;image-rendering:pixelated;touch-action:none}
+.gameBox canvas{width:min(calc(100vw - 140px),calc((100vh - 190px) * 240 / 136),1400px);height:auto;aspect-ratio:240/136;image-rendering:pixelated;touch-action:none}
+.gameBox:fullscreen{padding:0}
+.gameBox:fullscreen canvas{width:min(100vw,calc(100vh * 240 / 136))}
 .gSide{display:flex;flex-direction:column;gap:14px;flex:1;min-width:250px;max-width:420px}
 .gSide .sysCard{display:flex;flex-direction:column}
 .gStats{display:grid;grid-template-columns:1fr auto;gap:4px 14px}
@@ -24,6 +26,7 @@ const GL_P = {
 };
 GL_P.left = GL_P.right.map(r => [...r].reverse().join(''));
 const GL_PAL = { k: '#16141e', w: '#f4f4fa', o: '#ff9a2a', r: '#e83a4a' };
+const GL_NEW = { 61: ['NOUVEAU : GLACE FISSURÉE', 'Elle casse quand tu la quittes'], 66: ['NOUVEAU : TAS DE NEIGE', 'Pousse-le : il glisse à son tour'], 71: ['NOUVEAU : TÉLÉPORTEURS', "Entre dans l'un, ressors de l'autre"] };
 const GL_DIR = { ArrowUp: [0, -1, 'up'], ArrowDown: [0, 1, 'down'], ArrowLeft: [-1, 0, 'left'], ArrowRight: [1, 0, 'right'] };
 /* ---------- l'habillage pixel art, dessiné à la main : police bitmap (accents compris), cadres, boutons, icônes ----------
    Tout est en pixels pleins, agrandis par 2 sans lissage : aucun dégradé, aucune ombre floue. */
@@ -335,42 +338,82 @@ export default async function (ctx) {
   pxSkin(view.querySelector('.appWrap'), { title: 'GLACE', T: theme('#8ad8ff', '#e0f6ff', '#4a9ac8', '#0a2030', '#ff6a7a'),
     emblem: ['....kkkk....', '...kkkkkk...', '..kkwwwwkk..', '..kwkwwkwk..', '..kwwaawwk..', '.krrrrrrrrk.', '.kkwwwwwwkk.', '..kwwwwwwk..', '..kkwwwwkk..', '...aa..aa...', 'bbbbbbbbbbbb', '.b.b.b.b.b.b'],
     icons: [[/^RECOMMENCER/, 'play'], [/^RECORDS/, 'crown']] });
-  const W = 240, H = 136, T = 12, COLS = 20, ROWS = 10, Y0 = 16, MAXL = 60;
+  const W = 240, H = 136, T = 12, COLS = 20, ROWS = 10, Y0 = 16, MAXL = 80;
   const save = { level: 1, stars: {}, moves: 0, ...(await doc('records')) };
-  const keep = () => folder.write('records', save).catch(() => {});
-  // une glissade depuis (x, y) : jusqu'au rocher, au bord ou à la neige ; le drapeau l'arrête aussi
-  const slide = (L, x, y, dx, dy) => { for (;;) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= L.w || ny >= L.h || L.g[ny][nx] === '#') return [x, y]; x = nx; y = ny; if (L.g[y][x] === 's' || (x === L.ex && y === L.ey)) return [x, y]; } };
-  // le plus court chemin (en coups) du départ au drapeau, et le premier coup de chaque position vers lui
-  function solve(L, sx = L.sx, sy = L.sy) {
-    const k = (x, y) => y * L.w + x, dist = new Map([[k(sx, sy), 0]]), from = new Map(), q = [[sx, sy]];
-    for (let i = 0; i < q.length; i++) { const [x, y] = q[i], d = dist.get(k(x, y));
-      if (x === L.ex && y === L.ey) { let c = k(x, y), path = []; while (from.has(c)) { const [p, m] = from.get(c); path.unshift(m); c = p; } return { n: d, path, reach: dist }; }
-      for (const [m, [dx, dy]] of Object.entries(GL_DIR)) { const [nx, ny] = slide(L, x, y, dx, dy), nk = k(nx, ny); if (!dist.has(nk)) { dist.set(nk, d + 1); from.set(nk, [k(x, y), m]); q.push([nx, ny]); } } }
-    return { n: Infinity, path: [], reach: dist };
+  if (save.level === 60 && save.stars[60]) save.level = 61;  // les 20 nouveaux niveaux s'ouvrent à qui avait fini le 60
+  const keep = () => mute ? 0 : folder.write('records', save).catch(() => {});  // rien n'est écrit pendant la vérification (mute), qui joue des niveaux pour de faux
+  // un coup depuis l'état S = {x, y, br, pl} : le pingouin glisse jusqu'au rocher, au bord, à l'eau ou à un tas de neige (qu'il pousse) ;
+  // la neige et le drapeau l'arrêtent ; la glace fissurée casse quand il la quitte (br : fissures cassées) ; un téléporteur l'envoie sur l'autre, d'où il repart
+  function step(L, S, dx, dy) {
+    let { x, y, br } = S; const pl = S.pl.slice(), path = [[x, y]], broke = [], at = (cx, cy) => cy * L.w + cx; let pile = null, tel = false;
+    const wall = (cx, cy) => cx < 0 || cy < 0 || cx >= L.w || cy >= L.h || L.g[cy][cx] === '#' || (L.g[cy][cx] === 'c' && (br >> L.ci[at(cx, cy)] & 1));
+    for (let guard = 0; guard < 400; guard++) {
+      const nx = x + dx, ny = y + dy; if (wall(nx, ny)) break;
+      const pi = pl.indexOf(at(nx, ny));
+      if (pi >= 0) {  // un tas de neige : il glisse à son tour jusqu'à un obstacle (ou s'arrête dans la neige), le pingouin reste derrière
+        let qx = nx, qy = ny; const pp = [[qx, qy]];
+        for (;;) { const ax = qx + dx, ay = qy + dy; if (wall(ax, ay) || pl.includes(at(ax, ay)) || (ax === L.ex && ay === L.ey) || L.g[ay][ax] === 'T' || (ax === x && ay === y)) break; qx = ax; qy = ay; pp.push([qx, qy]); if (L.g[qy][qx] === 's') break; }
+        if (pp.length > 1) { pl[pi] = at(qx, qy); pl.sort((a, b) => a - b); pile = { path: pp }; }
+        break;
+      }
+      if (L.g[y][x] === 'c' && !(br >> L.ci[at(x, y)] & 1)) { br |= 1 << L.ci[at(x, y)]; broke.push([x, y, path.length - 1]); }
+      x = nx; y = ny; path.push([x, y]);
+      if (L.g[y][x] === 's' || (x === L.ex && y === L.ey)) break;
+      if (L.g[y][x] === 'T') { if (tel) break; [x, y] = L.tp[L.tp[0][0] === x && L.tp[0][1] === y ? 1 : 0]; path.push([x, y]); tel = true; }
+    }
+    if (x === S.x && y === S.y && !pile && br === S.br) return null;
+    return { S: { x, y, br, pl }, path, broke, pile, tel };
   }
-  // le niveau n : sa taille grandit, ses rochers et sa neige sont tirés de son numéro, puis on garde le drapeau le plus loin (en coups) qui reste faisable
+  const skey = S => S.x + ',' + S.y + (S.br || S.pl.length ? '|' + S.br + '|' + S.pl.join('.') : '');
+  const start0 = L => ({ x: L.sx, y: L.sy, br: 0, pl: L.pl || [] });
+  // le plus court chemin (en coups) jusqu'au drapeau ; pos : chaque case atteinte et en combien de coups (pour placer le drapeau loin)
+  function solve(L, S0 = start0(L), cap = 60000) {
+    const dist = new Map([[skey(S0), 0]]), from = new Map(), q = [S0], pos = new Map([[S0.y * L.w + S0.x, 0]]);
+    for (let i = 0; i < q.length && q.length < cap; i++) { const S = q[i], k = skey(S), d = dist.get(k);
+      if (S.x === L.ex && S.y === L.ey) { let c = k, path = []; while (from.has(c)) { const [p, m] = from.get(c); path.unshift(m); c = p; } return { n: d, path, pos }; }
+      for (const [m, [dx, dy]] of Object.entries(GL_DIR)) { const r = step(L, S, dx, dy); if (!r) continue; const nk = skey(r.S);
+        if (!dist.has(nk)) { dist.set(nk, d + 1); from.set(nk, [k, m]); q.push(r.S); const p = r.S.y * L.w + r.S.x; if (!pos.has(p)) pos.set(p, d + 1); } } }
+    return { n: Infinity, path: [], pos };
+  }
+  // le niveau n : sa taille grandit, ses rochers et sa neige sont tirés de son numéro, puis on garde le drapeau le plus loin (en coups) qui reste faisable ;
+  // après le niveau 60 viennent la glace fissurée (61), les tas de neige à pousser (66) puis les téléporteurs (71), et le plus court chemin doit s'en servir
+  const levels = new Map();
   function makeLevel(n) {
-    const r = seeded(n * 7919 + 17), w = Math.min(COLS, 7 + n), h = Math.min(ROWS, 5 + Math.floor(n / 2)), want = Math.min(14, 3 + Math.floor(n * .6));
+    if (levels.has(n)) return levels.get(n);
+    const r = seeded(n * 7919 + 17), w = Math.min(COLS, 7 + n), h = Math.min(ROWS, 5 + Math.floor(n / 2)), want = n > 60 ? Math.min(16, 9 + Math.floor((n - 61) / 3)) : Math.min(14, 3 + Math.floor(n * .6));
+    const crack = n >= 61, piles = n >= 76 ? 2 : n >= 66 ? 1 : 0, tel = n >= 71, need = n >= 76 ? 'b' : n >= 71 ? 'T' : n >= 66 ? 'b' : 'c';
     let best = null;
     for (let tries = 0; tries < 80; tries++) {
-      const g = Array.from({ length: h }, () => Array.from({ length: w }, () => r() < .14 ? '#' : n > 3 && r() < .05 ? 's' : '.'));
+      const g = Array.from({ length: h }, () => Array.from({ length: w }, () => r() < .14 ? '#' : n > 3 && r() < .05 ? 's' : crack && r() < (n >= 66 ? .05 : .09) ? 'c' : '.'));
       const L = { w, h, g, sx: Math.floor(r() * w), sy: Math.floor(r() * h), ex: -1, ey: -1 }; g[L.sy][L.sx] = '.';
-      const far = [...solve(L).reach.entries()].sort((a, b) => b[1] - a[1]);
-      for (const [c] of far.slice(0, 6)) { const ex = c % w, ey = Math.floor(c / w); if (ex === L.sx && ey === L.sy) continue;
+      if (n > 60) {
+        const free = () => { for (let k = 0; k < 50; k++) { const x = Math.floor(r() * w), y = Math.floor(r() * h); if (g[y][x] === '.' && (x !== L.sx || y !== L.sy) && !(L.pl || []).includes(y * w + x)) return [x, y]; } return null; };
+        L.ci = new Int8Array(w * h).fill(-1); let nc = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (g[y][x] === 'c') { if (nc < 6) L.ci[y * w + x] = nc++; else g[y][x] = '.'; }
+        if (tel) { const a = free(); if (a) g[a[1]][a[0]] = 'T'; const b = free(); if (b) g[b[1]][b[0]] = 'T'; if (!a || !b) continue; L.tp = [a, b]; }
+        L.pl = []; for (let k = 0; k < piles; k++) { const p = free(); if (p && p[0] > 0 && p[1] > 0 && p[0] < w - 1 && p[1] < h - 1) L.pl.push(p[1] * w + p[0]); } L.pl.sort((a, b) => a - b);
+      }
+      const far = [...solve(L).pos.entries()].sort((a, b) => b[1] - a[1]);
+      for (const [c] of far.slice(0, 6)) { const ex = c % w, ey = Math.floor(c / w); if ((ex === L.sx && ey === L.sy) || g[ey][ex] === 'T' || g[ey][ex] === 'c') continue;
         const M = { ...L, ex, ey }, s = solve(M); if (s.n === Infinity) continue;
+        if (n > 60 && (s.n > want + 8 || !uses(M, s.path, need))) continue;  // pas de niveau interminable
         if (!best || s.n > best.opt) best = { ...M, opt: s.n };
-        if (s.n >= want) return best; }
+        if (s.n >= want) { levels.set(n, best); return best; } }
     }
-    return best;
+    levels.set(n, best); return best;
   }
+  // le plus court chemin passe-t-il par la nouveauté du niveau (fissure cassée, tas poussé, téléporteur pris) ?
+  function uses(L, path, f) { let S = start0(L), u = false; for (const m of path) { const [dx, dy] = GL_DIR[m], r = step(L, S, dx, dy); if (f === 'c' ? r.broke.length : f === 'b' ? r.pile : r.tel) u = true; S = r.S; } return u; }
   let g = null, st = null;
-  const start = n => { const L = makeLevel(n); st = { n, L, x: L.sx, y: L.sy, ax: L.sx, ay: L.sy, face: 'down', moves: 0, hist: [], hint: false, mode: 'play', tick: 0, anim: null, won: false, dead: 0 }; info(); };
+  const start = n => { const L = makeLevel(n); st = { n, L, S: start0(L), x: L.sx, y: L.sy, face: 'down', moves: 0, hist: [], hint: false, mode: 'play', tick: 0, anim: null, won: false, dead: 0, intro: GL_NEW[n] ? 300 : 0 }; info(); };
   function move(m) {
     if (st.mode !== 'play' || st.anim) return;
-    const [dx, dy, face] = GL_DIR[m], [nx, ny] = slide(st.L, st.x, st.y, dx, dy); st.face = face;
-    if (nx === st.x && ny === st.y) { beep(140, .06); return; }
-    st.hist.push([st.x, st.y]); st.anim = { fx: st.x, fy: st.y, t: 0, d: Math.abs(nx - st.x) + Math.abs(ny - st.y) }; st.x = nx; st.y = ny; st.moves++; save.moves++;
+    const [dx, dy, face] = GL_DIR[m], r = step(st.L, st.S, dx, dy); st.face = face;
+    if (!r) { beep(140, .06); return; }
+    st.hist.push(st.S); st.anim = { ...r, t: 0, d: r.path.length - 1 + (r.pile ? r.pile.path.length - 1 : 0) }; st.S = r.S; st.x = r.S.x; st.y = r.S.y; st.moves++; save.moves++; st.intro = Math.min(st.intro, 40);
     beep(700, .12, 'triangle', 300, .025);
+    r.broke.forEach(([, , i]) => beep(1800, .05, 'square', 600, .02, i * .033 + .03));  // la fissure craque au passage
+    if (r.tel) beep(300, .3, 'sine', 1400, .03, .05);
+    if (r.pile) beep(160, .2, 'triangle', 90, .03, (r.path.length - 1) * .033);
   }
   function arrive() {
     if (st.x !== st.L.ex || st.y !== st.L.ey) { if (st.L.g[st.y][st.x] === 's') beep(220, .05, 'square', 0, .02); return; }
@@ -378,16 +421,24 @@ export default async function (ctx) {
     if (s > (save.stars[st.n] || 0)) save.stars[st.n] = s; if (st.n === save.level && st.n < MAXL) save.level = st.n + 1;
     keep(); info(); [523, 659, 784, 1047].forEach((f, i) => beep(f, .15, 'square', 0, .03, i * .09));
   }
-  function undo() { if (st.mode !== 'play' || st.anim || !st.hist.length) return; [st.x, st.y] = st.hist.pop(); st.moves++; beep(300, .05); }
-  function hint() { if (st.mode !== 'play' || st.anim) return; const s = solve(st.L, st.x, st.y); if (!s.path.length) return; st.hint = true; st.show = { m: s.path[0], t: 90 }; }
+  function undo() { if (st.mode !== 'play' || st.anim || !st.hist.length) return; st.S = st.hist.pop(); st.x = st.S.x; st.y = st.S.y; st.moves++; beep(300, .05); }
+  function hint() { if (st.mode !== 'play' || st.anim) return; const s = solve(st.L, st.S); if (!s.path.length) return; st.hint = true; st.show = { m: s.path[0], t: 90 }; }
   function update() {
-    st.tick++; if (st.show && --st.show.t <= 0) st.show = null;
+    st.tick++; if (st.show && --st.show.t <= 0) st.show = null; if (st.intro > 0) st.intro--;
     if (st.mode === 'won') { st.dead++; return; }
     if (st.anim) { st.anim.t += .5; if (st.anim.t >= st.anim.d) { st.anim = null; arrive(); } }
   }
   function tile(x, y, c) {
     const X = x * T, Y = Y0 + y * T;
     if (c === '#') { px(g, '#bfe6ff', X, Y, T, T); px(g, '#3a4a5a', X + 1, Y + 2, T - 2, T - 3); px(g, '#5a6e82', X + 2, Y + 2, T - 5, T - 6); px(g, '#8a9cb0', X + 3, Y + 3, 3, 2); px(g, '#f4faff', X + 2, Y + 1, T - 5, 2); px(g, '#26323e', X + 1, Y + T - 2, T - 2, 1); return; }
+    if (c === 'c' || c === 'w') {  // glace fissurée, puis eau une fois cassée
+      if (c === 'w') { px(g, '#1a5a8a', X, Y, T, T); px(g, '#2a78b0', X, Y, T, 1); const o = Math.floor(st.tick / 20 + x + y) % 3; px(g, '#4a9ad0', X + 2 + o, Y + 4, 3, 1); px(g, '#4a9ad0', X + 6 - o, Y + 8, 3, 1); return; }
+      px(g, '#b4dcf4', X, Y, T, T); px(g, '#a8d8f4', X, Y + T - 1, T, 1); px(g, '#a8d8f4', X + T - 1, Y, 1, T);
+      for (const [i, j] of [[2, 2], [3, 3], [4, 3], [5, 4], [6, 5], [6, 6], [7, 7], [8, 8], [5, 5], [4, 6], [3, 7], [7, 4], [8, 3], [9, 3], [6, 8], [6, 9]]) px(g, '#5a8eb4', X + i, Y + j);
+      px(g, '#e8f8ff', X + 2, Y + 9, 2, 1); return; }
+    if (c === 'T') {  // téléporteur : un anneau violet qui tourne
+      px(g, '#bfe6ff', X, Y, T, T); px(g, '#4a2a7a', X + 2, Y + 2, 8, 8); px(g, '#b06aff', X + 3, Y + 2, 6, 1); px(g, '#b06aff', X + 3, Y + 9, 6, 1); px(g, '#b06aff', X + 2, Y + 3, 1, 6); px(g, '#b06aff', X + 9, Y + 3, 1, 6);
+      const a = Math.floor(st.tick / 6) % 4, sp = [[4, 4], [7, 4], [7, 7], [4, 7]]; for (let i = 0; i < 2; i++) { const [u, v] = sp[(a + i * 2) % 4]; px(g, '#f0d8ff', X + u, Y + v, 1, 1); } px(g, '#e0c0ff', X + 5, Y + 5, 2, 2); return; }
     if (c === 's') { px(g, '#f0f6fa', X, Y, T, T); px(g, '#d4e2ec', X + 2, Y + 3, 1, 1); px(g, '#d4e2ec', X + 7, Y + 6, 1, 1); px(g, '#d4e2ec', X + 4, Y + 9, 1, 1); px(g, '#ffffff', X + 9, Y + 2, 1, 1); return; }
     px(g, '#bfe6ff', X, Y, T, T); px(g, '#a8d8f4', X, Y + T - 1, T, 1); px(g, '#a8d8f4', X + T - 1, Y, 1, T);
     if ((x * 7 + y * 13) % 5 === 0) { px(g, '#e8f8ff', X + 3, Y + 3, 4, 1); px(g, '#e8f8ff', X + 7, Y + 4, 1, 1); }
@@ -399,9 +450,15 @@ export default async function (ctx) {
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) px(g, (x + y) % 2 ? '#122a42' : '#10263c', x * T, Y0 + y * T, T, T);
     const ox = Math.floor((COLS - L.w) / 2), oy = Math.floor((ROWS - L.h) / 2);
     g.save(); g.translate(ox * T, oy * T);
-    for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) tile(x, y, L.g[y][x]);
+    const A = st.anim, intact = new Set(A ? A.broke.filter(([, , i]) => A.t < i + 1).map(([x, y]) => y * L.w + x) : []);
+    for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const c = L.g[y][x]; tile(x, y, c === 'c' && (st.S.br >> L.ci[y * L.w + x] & 1) && !intact.has(y * L.w + x) ? 'w' : c); }
+    // les tas de neige (celui qu'on pousse glisse après l'arrêt du pingouin)
+    const heap = (X, Y) => { px(g, '#8ab8d8', X + 1, Y + T - 2, T - 2, 1); px(g, '#c8dcea', X + 1, Y + 5, T - 2, 6); px(g, '#ffffff', X + 2, Y + 3, T - 4, 6); px(g, '#ffffff', X + 4, Y + 2, 4, 1); px(g, '#e0ecf4', X + 3, Y + 8, 6, 1); px(g, '#ffffff', X + 3, Y + 4, 2, 1); };
+    for (const p of st.S.pl) { const x = p % L.w, y = Math.floor(p / L.w), pp = A?.pile?.path;
+      if (pp && pp[pp.length - 1][0] === x && pp[pp.length - 1][1] === y) { const k = Math.max(0, Math.min(pp.length - 1, A.t - (A.path.length - 1))), i = Math.floor(k), f = k - i, [ax, ay] = pp[i], [bx, by] = pp[Math.min(pp.length - 1, i + 1)]; heap((ax + (bx - ax) * f) * T, Y0 + (ay + (by - ay) * f) * T); }
+      else heap(x * T, Y0 + y * T); }
     { const X = L.ex * T, Y = Y0 + L.ey * T, wv = Math.floor(st.tick / 12) % 2; px(g, '#5a3a1e', X + 3, Y + 1, 1, 10); px(g, '#e83a4a', X + 4, Y + 1, 5, 4); px(g, '#ff7a6a', X + 4, Y + 1, 5, 1); if (wv) px(g, '#e83a4a', X + 9, Y + 2, 1, 2); px(g, '#8ab8d8', X + 1, Y + 10, 5, 1); }
-    let fx = st.x, fy = st.y; if (st.anim) { const a = st.anim, k = a.t / a.d; fx = a.fx + (st.x - a.fx) * k; fy = a.fy + (st.y - a.fy) * k; }
+    let fx = st.x, fy = st.y; if (A) { const k = Math.min(A.path.length - 1, A.t), i = Math.floor(k), [ax, ay] = A.path[i], [bx, by] = A.path[Math.min(A.path.length - 1, i + 1)], f = Math.abs(bx - ax) + Math.abs(by - ay) > 1 ? 1 : k - i; fx = ax + (bx - ax) * f; fy = ay + (by - ay) * f; }
     const bob = st.anim ? 0 : Math.floor(st.tick / 30) % 2;
     px(g, '#8ab8d8', fx * T + 2, Y0 + fy * T + T - 1, 8, 1);
     sprite(g, GL_P[st.face], Math.round(fx * T) + 1, Math.round(Y0 + fy * T) + 1 - bob, GL_PAL);
@@ -410,6 +467,7 @@ export default async function (ctx) {
     px(g, '#08141f', 0, 0, W, 14);
     pxFont(g, 'Niveau ' + st.n, 4, 11, '#ffffff');
     pxFont(g, st.moves + ' coups · meilleur : ' + L.opt, W - 4, 11, '#8ad8ff', 8, 'right');
+    if (st.intro > 0 && st.mode === 'play' && GL_NEW[st.n] && st.intro % 1 === 0 && (st.intro > 40 || st.intro % 8 < 5)) { px(g, 'rgba(8,20,31,.9)', 0, H - 26, W, 26); pxFont(g, GL_NEW[st.n][0], W / 2, H - 15, '#b06aff', 8, 'center'); pxFont(g, GL_NEW[st.n][1], W / 2, H - 4, '#e0f6ff', 8, 'center'); }
     if (st.mode === 'pause') gameText(g, W, [['PAUSE', '#8ad8ff', 12], ['Entrée : reprendre', '#b8b0c8']], 64);
     if (st.mode === 'won' && st.dead > 20) gameText(g, W, [['BRAVO !', '#7ae05a', 12], ['★'.repeat(st.stars) + '☆'.repeat(3 - st.stars), '#ffd84a', 12], [st.moves + ' coups (le plus court : ' + L.opt + ')', '#ffffff'], [st.dead > 40 ? (st.n < MAXL ? 'Entrée : niveau suivant' : 'Tu as fini les ' + MAXL + ' niveaux !') : '', '#b8b0c8']], 48);
     if (st.tick % 15 === 0) g.canvas.setAttribute('aria-label', 'Glace, niveau ' + st.n + ' : pingouin en ' + (st.x + 1) + ', ' + (st.y + 1) + ', drapeau en ' + (L.ex + 1) + ', ' + (L.ey + 1) + ', ' + st.moves + ' coups' + (st.mode === 'won' ? ', niveau fini' : '') + '.');
@@ -438,18 +496,28 @@ export default async function (ctx) {
   }
   $('glNew').onclick = () => { start(st.n); $('glNew').blur(); };
   $('glPrev').onclick = () => go(st.n - 1); $('glNext').onclick = () => go(st.n + 1);
+  $('glFs').onclick = () => { $('glFs').blur(); try { if (document.fullscreenElement) document.exitFullscreen(); else $('glCanvas').parentElement.requestFullscreen?.().catch(() => {}); } catch {} };
   padKeys({ 3: 'h', 4: 'r' });
-  {  // vérification : les 60 niveaux sont faisables et assez longs, la solution trouvée les finit, et le même numéro donne toujours le même niveau
-    const bad = [], keepS = JSON.stringify(save); mute = true;
-    for (let n = 1; n <= MAXL; n++) { const L = makeLevel(n); if (!L || L.opt === Infinity) { bad.push(n + ' : impossible'); continue; } if (L.opt < Math.min(3, 2 + n)) bad.push(n + ' : trop court (' + L.opt + ')');
-      if (JSON.stringify(makeLevel(n).g) !== JSON.stringify(L.g)) bad.push(n + ' : pas toujours le même'); }
-    start(5); for (const m of solve(st.L).path) { move(m); while (st.anim) update(); }
-    if (st.mode !== 'won' || st.stars !== 3) bad.push('la solution ne finit pas le niveau');
-    console.assert(!bad.length, 'glace', bad); view.dataset.selfcheck = bad.join(' | ') || 'ok';
-    Object.keys(save).forEach(k => delete save[k]); Object.assign(save, JSON.parse(keepS)); mute = false;
+  // vérification : les niveaux sont faisables et assez longs, le même numéro donne toujours le même niveau, la solution trouvée les finit (avec ses fissures,
+  // tas poussés et téléporteurs) ; les règles des nouveautés sur un petit plateau fait main. Au démarrage : les 60 premiers et un niveau de chaque nouveauté (all : les 80)
+  function glCheck(all) {
+    const bad = [], keepS = JSON.stringify(save), keepSt = st; mute = true;
+    for (let n = 1; n <= MAXL; n++) { if (!all && n > 60 && ![61, 66, 72].includes(n)) continue; const L = makeLevel(n); if (!L || L.opt === Infinity) { bad.push(n + ' : impossible'); continue; } if (L.opt < Math.min(3, 2 + n) || (n > 60 && L.opt < 8)) bad.push(n + ' : trop court (' + L.opt + ')');
+      if (n <= 60 || all) { levels.delete(n); if (JSON.stringify([makeLevel(n).g, makeLevel(n).pl]) !== JSON.stringify([L.g, L.pl])) bad.push(n + ' : pas toujours le même'); } }
+    for (const n of all ? [5, 61, 66, 71, 76, 80] : [5, 61]) { start(n); for (const m of solve(st.L).path) { move(m); while (st.anim) update(); } if (st.mode !== 'won' || st.stars !== 3) bad.push(n + ' : la solution ne finit pas le niveau'); }
+    // fait main : P glisse à droite sur une fissure, la casse ; revenir à gauche s'arrête avant l'eau ; le tas poussé glisse jusqu'au rocher ; le téléporteur renvoie et on repart
+    const L = { w: 7, h: 3, g: ['.c.....', '..b..#.', 'T..#.T.'].map(r => [...r.replace('b', '.')]), ex: 6, ey: 0, ci: new Int8Array(21).fill(-1), tp: [[0, 2], [5, 2]], pl: [1 * 7 + 2] }; L.ci[1] = 0;
+    let r = step(L, { x: 0, y: 0, br: 0, pl: L.pl }, 1, 0); if (!r || r.S.x !== 6 || r.S.br !== 1 || !r.broke.length) bad.push('fissure : ' + JSON.stringify(r?.S));
+    r = r && step(L, { ...r.S, x: 3 }, -1, 0); if (!r || r.S.x !== 2) bad.push('eau : ' + JSON.stringify(r?.S));
+    r = step(L, { x: 0, y: 1, br: 0, pl: L.pl }, 1, 0); if (!r || r.S.x !== 1 || r.S.pl[0] !== 1 * 7 + 4) bad.push('tas : ' + JSON.stringify(r?.S));
+    r = step(L, { x: 2, y: 2, br: 0, pl: [] }, -1, 0); if (!r || !r.tel || r.S.x !== 4 || r.S.y !== 2) bad.push('téléporteur : ' + JSON.stringify(r?.S));
+    Object.keys(save).forEach(k => delete save[k]); Object.assign(save, JSON.parse(keepS)); mute = false; st = keepSt;
+    return bad.join(' | ') || 'ok';
   }
+  { const c = glCheck(); console.assert(c === 'ok', 'glace', c); view.dataset.selfcheck = c; }
   start(Math.min(save.level, MAXL));
-  view.querySelector('#glCanvas').__solve = () => solve(st.L, st.x, st.y).path;  // pour le test « local »
+  view.querySelector('#glCanvas').__solve = () => solve(st.L, st.S).path;  // pour le test « local »
+  view.querySelector('#glCanvas').__gl = { st: () => st, check: glCheck, go: n => { save.level = Math.max(save.level, n); start(n); } };
   const STEP = 1000 / 60; let acc = 0, last = performance.now(), raf = 0;
   const frame = t => { if (!on()) { raf = 0; if (st.mode === 'play') st.mode = 'pause'; return; } raf = requestAnimationFrame(frame); acc += Math.min(200, t - last); last = t; while (acc >= STEP) { update(); acc -= STEP; } draw(); };
   ctx.onOpen(() => { g ??= $('glCanvas').getContext('2d'); info(); last = performance.now(); if (!raf) raf = requestAnimationFrame(frame); });
