@@ -81,5 +81,7 @@
  "la solution ne finit pas le niveau": "the solution does not finish the level",
  "le niveau devait être fini : «": "the level should be done: «",
  "vérification interne :": "self-check:",
- "Étoiles": "Stars"
+ "Étoiles": "Stars",
+ ": la solution ne finit pas le niveau": ": the solution does not finish the level",
+ "téléporteur :": "teleporter:"
 }
