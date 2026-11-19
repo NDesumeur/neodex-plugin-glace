@@ -60,7 +60,6 @@
  "Niveau": "Level",
  "Niveau ": "Level ",
  "Niveau atteint": "Level reached",
- "Niveaux et étoiles.": "Levels and stars.",
  "Nt": "Nt",
  "Oa": "Oa",
  "Oc": "Oc",
@@ -83,5 +82,6 @@
  "vérification interne :": "self-check:",
  "Étoiles": "Stars",
  ": la solution ne finit pas le niveau": ": the solution does not finish the level",
- "téléporteur :": "teleporter:"
+ "téléporteur :": "teleporter:",
+ "Rien n'est synchronisé : tes records restent sur cet appareil.": "Nothing is synced: your records stay on this device."
 }
