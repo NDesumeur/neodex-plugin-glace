@@ -4,6 +4,10 @@ Un casse-tête en pixel art : sur la glace, le pingouin ne s’arrête pas. Il g
 
 *English version: [README.en.md](README.en.md)*
 
+## Niveau du jour et éditeur (nouveau en 1.2.0)
+
+Un niveau nouveau chaque jour, le même pour tout le monde, avec une série de jours. L’éditeur permet de poser rochers, neige, pingouin et drapeau, de voir tout de suite le plus court chemin, d’essayer son niveau, de le garder et de le partager par un code.
+
 ## Commandes
 
 - **Flèches** : glisser · **Retour arrière** ou **U** : annuler · **R** : recommencer · **H** : indice · **P** : pause.

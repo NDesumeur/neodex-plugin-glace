@@ -6,6 +6,13 @@ const HTML = `<div class="appWrap wide">
     <div class="gSide">
       <div class="sysCard"><b>RECORDS</b><div class="gStats" id="glStats"></div></div>
       <div class="row"><button class="btn main" id="glNew">RECOMMENCER</button><button class="btn" id="glPrev">◀</button><button class="btn" id="glNext">▶</button><button class="btn" id="glFs">PLEIN ÉCRAN</button></div>
+      <div class="row"><button class="btn" id="glDaily">NIVEAU DU JOUR</button><button class="btn" id="glEdit">ÉDITEUR</button></div>
+      <div class="sysCard glEd" id="glEd" hidden><b>ÉDITEUR</b>
+        <div class="row" id="glTools"><button class="btn" data-t="#">Rocher</button><button class="btn" data-t="s">Neige</button><button class="btn" data-t=".">Glace</button><button class="btn" data-t="P">Pingouin</button><button class="btn" data-t="F">Drapeau</button></div>
+        <div class="row"><button class="btn main" id="glTest">ESSAYER</button><button class="btn" id="glSave">GARDER</button><button class="btn" id="glClear">VIDER</button></div>
+        <div class="row"><input class="f" id="glCode" placeholder="Code d’un niveau" spellcheck="false"><button class="btn" id="glCopy">COPIER</button><button class="btn" id="glPaste">OUVRIR</button></div>
+        <label class="row">Mes niveaux <select class="f gSel" id="glMine"></select></label>
+      </div>
       <div class="hint">Sur la glace, le pingouin ne s'arrête pas : il glisse jusqu'au prochain rocher ou jusqu'au bord. La neige l'arrête net. Amène-le sur le drapeau. Trois étoiles si tu trouves le plus court chemin, deux s'il te faut deux coups de plus. Un indice montre le bon coup, mais la partie ne vaut plus qu'une étoile. Après le niveau 60 : la glace fissurée casse quand tu la quittes (l'eau t'arrête ensuite), les tas de neige se poussent et glissent à leur tour, les téléporteurs t'envoient de l'un à l'autre.</div>
     </div></div>
 </div>`;
@@ -16,6 +23,10 @@ const CSS = `.gMain{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
 .gameBox:fullscreen canvas{width:min(100vw,calc(100vh * 240 / 136))}
 .gSide{display:flex;flex-direction:column;gap:14px;flex:1;min-width:250px;max-width:420px}
 .gSide .sysCard{display:flex;flex-direction:column}
+.glEd{gap:8px}
+.glEd .row{flex-wrap:wrap}
+#glTools .btn.on{outline:3px solid #ffd84a}
+#glCode{min-width:0;flex:1}
 .gStats{display:grid;grid-template-columns:1fr auto;gap:4px 14px}
 .gStats b{text-align:right}`;
 // le pingouin, de face, de dos et de profil (un seul œil) ; k noir, w blanc, o orange, r écharpe
@@ -378,9 +389,9 @@ export default async function (ctx) {
   // le niveau n : sa taille grandit, ses rochers et sa neige sont tirés de son numéro, puis on garde le drapeau le plus loin (en coups) qui reste faisable ;
   // après le niveau 60 viennent la glace fissurée (61), les tas de neige à pousser (66) puis les téléporteurs (71), et le plus court chemin doit s'en servir
   const levels = new Map();
-  function makeLevel(n) {
-    if (levels.has(n)) return levels.get(n);
-    const r = seeded(n * 7919 + 17), w = Math.min(COLS, 7 + n), h = Math.min(ROWS, 5 + Math.floor(n / 2)), want = n > 60 ? Math.min(16, 9 + Math.floor((n - 61) / 3)) : Math.min(14, 3 + Math.floor(n * .6));
+  function makeLevel(n, seed) {
+    const key = seed ? 'd' + seed : n; if (levels.has(key)) return levels.get(key);
+    const r = seeded(seed ?? n * 7919 + 17), w = Math.min(COLS, 7 + n), h = Math.min(ROWS, 5 + Math.floor(n / 2)), want = n > 60 ? Math.min(16, 9 + Math.floor((n - 61) / 3)) : Math.min(14, 3 + Math.floor(n * .6));
     const crack = n >= 61, piles = n >= 76 ? 2 : n >= 66 ? 1 : 0, tel = n >= 71, need = n >= 76 ? 'b' : n >= 71 ? 'T' : n >= 66 ? 'b' : 'c';
     let best = null;
     for (let tries = 0; tries < 80; tries++) {
@@ -397,14 +408,37 @@ export default async function (ctx) {
         const M = { ...L, ex, ey }, s = solve(M); if (s.n === Infinity) continue;
         if (n > 60 && (s.n > want + 8 || !uses(M, s.path, need))) continue;  // pas de niveau interminable
         if (!best || s.n > best.opt) best = { ...M, opt: s.n };
-        if (s.n >= want) { levels.set(n, best); return best; } }
+        if (s.n >= want) { levels.set(key, best); return best; } }
     }
-    levels.set(n, best); return best;
+    levels.set(key, best); return best;
   }
   // le plus court chemin passe-t-il par la nouveauté du niveau (fissure cassée, tas poussé, téléporteur pris) ?
   function uses(L, path, f) { let S = start0(L), u = false; for (const m of path) { const [dx, dy] = GL_DIR[m], r = step(L, S, dx, dy); if (f === 'c' ? r.broke.length : f === 'b' ? r.pile : r.tel) u = true; S = r.S; } return u; }
   let g = null, st = null;
-  const start = n => { const L = makeLevel(n); st = { n, L, S: start0(L), x: L.sx, y: L.sy, face: 'down', moves: 0, hist: [], hint: false, mode: 'play', tick: 0, anim: null, won: false, dead: 0, intro: GL_NEW[n] ? 300 : 0 }; info(); };
+  // le niveau du jour (tiré d'après la date, le même pour tous) ; l'éditeur : ses niveaux, en code à copier pour les partager
+  const day = (k = 0) => { const d = new Date(Date.now() - k * 864e5); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  save.daily ??= { last: '', streak: 0, best: 0 }; save.mine ??= [];
+  const glCode = L => 'G1:' + L.w + 'x' + L.h + ':' + [L.sx, L.sy, L.ex, L.ey].join(',') + ':' + L.g.map(r => r.join('')).join('');
+  function glParse(code) {  // un code collé vient de n'importe où : on vérifie tout (taille, cases, positions) avant de s'en servir
+    const m = /^G1:(\d{1,2})x(\d{1,2}):(\d{1,2}),(\d{1,2}),(\d{1,2}),(\d{1,2}):([.#s]+)$/.exec(String(code).trim()); if (!m) return null;
+    const [w, h, sx, sy, ex, ey] = m.slice(1, 7).map(Number), cells = m[7];
+    if (w < 3 || h < 3 || w > COLS || h > ROWS || cells.length !== w * h || sx >= w || ex >= w || sy >= h || ey >= h || (sx === ex && sy === ey)) return null;
+    const g = Array.from({ length: h }, (_, y) => [...cells.slice(y * w, y * w + w)]); g[sy][sx] = '.'; g[ey][ex] = '.';
+    return { w, h, g, sx, sy, ex, ey, pl: [] };
+  }
+  const glOpt = L => solve(L).n;
+  const start = (n, opts = {}) => { const L = opts.L || (opts.daily && makeLevel(45, +day().replace(/-/g, ''))) || makeLevel(n); if (opts.L) L.opt = glOpt(L); st = { n, L, S: start0(L), x: L.sx, y: L.sy, face: 'down', moves: 0, hist: [], hint: false, mode: 'play', tick: 0, anim: null, won: false, dead: 0, intro: GL_NEW[n] && !opts.L && !opts.daily ? 300 : 0, daily: !!opts.daily, custom: !!opts.L }; info(); };
+  let ed = null;  // le niveau en cours d'édition et l'outil choisi
+  const edNew = () => ({ w: 12, h: 8, g: Array.from({ length: 8 }, () => Array(12).fill('.')), sx: 1, sy: 1, ex: 10, ey: 6, pl: [] });
+  function edOpen(L = ed?.L || edNew()) { ed = { L, tool: ed?.tool || '#' }; L.opt = glOpt(L); st = { n: 0, L, S: start0(L), x: L.sx, y: L.sy, face: 'down', moves: 0, hist: [], mode: 'edit', tick: 0, anim: null, dead: 0, intro: 0 }; $('glEd').hidden = false; edTools(); }
+  function edTools() { $('glTools').querySelectorAll('.btn').forEach(b => b.classList.toggle('on', b.dataset.t === ed.tool)); $('glMine').replaceChildren(Object.assign(el('option', '', save.mine.length ? '— choisir —' : 'aucun pour l’instant'), { value: '' }), ...save.mine.map((c, i) => { const L = glParse(c); return Object.assign(el('option', '', 'Niveau ' + (i + 1) + (L ? ' · ' + L.w + ' × ' + L.h : '')), { value: String(i) }); })); }
+  function edPut(x, y) {
+    const L = ed.L; if (x < 0 || y < 0 || x >= L.w || y >= L.h) return; const t = ed.tool;
+    if (t === 'P') { if (x === L.ex && y === L.ey) return; L.sx = x; L.sy = y; L.g[y][x] = '.'; st.x = x; st.y = y; st.S = start0(L); }
+    else if (t === 'F') { if (x === L.sx && y === L.sy) return; L.ex = x; L.ey = y; L.g[y][x] = '.'; }
+    else { if ((x === L.sx && y === L.sy) || (x === L.ex && y === L.ey)) return; L.g[y][x] = t; }
+    L.opt = glOpt(L); beep(500, .03, 'square', 0, .02);
+  }
   function move(m) {
     if (st.mode !== 'play' || st.anim) return;
     const [dx, dy, face] = GL_DIR[m], r = step(st.L, st.S, dx, dy); st.face = face;
@@ -418,14 +452,15 @@ export default async function (ctx) {
   function arrive() {
     if (st.x !== st.L.ex || st.y !== st.L.ey) { if (st.L.g[st.y][st.x] === 's') beep(220, .05, 'square', 0, .02); return; }
     st.mode = 'won'; st.dead = 0; const o = st.L.opt, s = st.hint ? 1 : st.moves <= o ? 3 : st.moves <= o + 2 ? 2 : 1; st.stars = s;
-    if (s > (save.stars[st.n] || 0)) save.stars[st.n] = s; if (st.n === save.level && st.n < MAXL) save.level = st.n + 1;
+    if (st.daily) { const d = save.daily; if (d.last !== day()) { d.streak = d.last === day(1) ? d.streak + 1 : 1; d.best = Math.max(d.best, d.streak); d.last = day(); } }
+    else if (!st.custom) { if (s > (save.stars[st.n] || 0)) save.stars[st.n] = s; if (st.n === save.level && st.n < MAXL) save.level = st.n + 1; }
     keep(); info(); [523, 659, 784, 1047].forEach((f, i) => beep(f, .15, 'square', 0, .03, i * .09));
   }
   function undo() { if (st.mode !== 'play' || st.anim || !st.hist.length) return; st.S = st.hist.pop(); st.x = st.S.x; st.y = st.S.y; st.moves++; beep(300, .05); }
   function hint() { if (st.mode !== 'play' || st.anim) return; const s = solve(st.L, st.S); if (!s.path.length) return; st.hint = true; st.show = { m: s.path[0], t: 90 }; }
   function update() {
     st.tick++; if (st.show && --st.show.t <= 0) st.show = null; if (st.intro > 0) st.intro--;
-    if (st.mode === 'won') { st.dead++; return; }
+    if (st.mode === 'won' || st.mode === 'edit') { st.dead++; return; }
     if (st.anim) { st.anim.t += .5; if (st.anim.t >= st.anim.d) { st.anim = null; arrive(); } }
   }
   function tile(x, y, c) {
@@ -465,36 +500,49 @@ export default async function (ctx) {
     if (st.show && st.tick % 20 < 14) { const [dx, dy] = GL_DIR[st.show.m], cx = st.x * T + 6 + dx * 10, cy = Y0 + st.y * T + 6 + dy * 10; px(g, '#ffd84a', cx - 2, cy - 2, 4, 4); px(g, '#ffd84a', cx + dx * 3 - 1, cy + dy * 3 - 1, 2, 2); }
     g.restore();
     px(g, '#08141f', 0, 0, W, 14);
-    pxFont(g, 'Niveau ' + st.n, 4, 11, '#ffffff');
-    pxFont(g, st.moves + ' coups · meilleur : ' + L.opt, W - 4, 11, '#8ad8ff', 8, 'right');
+    pxFont(g, st.mode === 'edit' ? 'Éditeur' : st.custom ? 'Mon niveau' : st.daily ? 'Niveau du jour' : 'Niveau ' + st.n, 4, 11, st.mode === 'edit' || st.daily ? '#ffd84a' : '#ffffff');
+    pxFont(g, st.mode === 'edit' ? (L.opt === Infinity ? 'pas de chemin jusqu’au drapeau' : 'le plus court : ' + L.opt + (L.opt > 1 ? ' coups' : ' coup')) : st.moves + ' coups · meilleur : ' + L.opt, W - 4, 11, st.mode === 'edit' && L.opt === Infinity ? '#ff6a7a' : '#8ad8ff', 8, 'right');
     if (st.intro > 0 && st.mode === 'play' && GL_NEW[st.n] && st.intro % 1 === 0 && (st.intro > 40 || st.intro % 8 < 5)) { px(g, 'rgba(8,20,31,.9)', 0, H - 26, W, 26); pxFont(g, GL_NEW[st.n][0], W / 2, H - 15, '#b06aff', 8, 'center'); pxFont(g, GL_NEW[st.n][1], W / 2, H - 4, '#e0f6ff', 8, 'center'); }
     if (st.mode === 'pause') gameText(g, W, [['PAUSE', '#8ad8ff', 12], ['Entrée : reprendre', '#b8b0c8']], 64);
-    if (st.mode === 'won' && st.dead > 20) gameText(g, W, [['BRAVO !', '#7ae05a', 12], ['★'.repeat(st.stars) + '☆'.repeat(3 - st.stars), '#ffd84a', 12], [st.moves + ' coups (le plus court : ' + L.opt + ')', '#ffffff'], [st.dead > 40 ? (st.n < MAXL ? 'Entrée : niveau suivant' : 'Tu as fini les ' + MAXL + ' niveaux !') : '', '#b8b0c8']], 48);
+    if (st.mode === 'won' && st.dead > 20) gameText(g, W, [['BRAVO !', '#7ae05a', 12], ['★'.repeat(st.stars) + '☆'.repeat(3 - st.stars), '#ffd84a', 12], [st.moves + ' coups (le plus court : ' + L.opt + ')', '#ffffff'], [st.dead > 40 ? (st.custom ? 'Entrée : retour à l’éditeur' : st.daily ? 'Entrée : retour aux niveaux' : st.n < MAXL ? 'Entrée : niveau suivant' : 'Tu as fini les ' + MAXL + ' niveaux !') : '', '#b8b0c8']], 48);
     if (st.tick % 15 === 0) g.canvas.setAttribute('aria-label', 'Glace, niveau ' + st.n + ' : pingouin en ' + (st.x + 1) + ', ' + (st.y + 1) + ', drapeau en ' + (L.ex + 1) + ', ' + (L.ey + 1) + ', ' + st.moves + ' coups' + (st.mode === 'won' ? ', niveau fini' : '') + '.');
   }
   function info() {
     const stars = Object.values(save.stars).reduce((a, b) => a + b, 0);
-    $('glStats').replaceChildren(...[['Niveau atteint', save.level], ['Étoiles', stars + ' / ' + MAXL * 3], ['Coups joués', save.moves]].flatMap(([a, c]) => [el('span', '', a), el('b', '', String(c))]));
+    $('glStats').replaceChildren(...[['Niveau atteint', save.level], ['Étoiles', stars + ' / ' + MAXL * 3], ['Coups joués', save.moves], ['Niveau du jour', save.daily.last === day() ? 'fait ✓' : 'à faire'], ['Série de jours', (save.daily.last === day() || save.daily.last === day(1) ? save.daily.streak : 0) + ' (record ' + save.daily.best + ')']].flatMap(([a, c]) => [el('span', '', a), el('b', '', String(c))]));
   }
-  const go = n => { if (n >= 1 && n <= Math.min(save.level, MAXL)) start(n); };
+  const go = n => { if (n >= 1 && n <= Math.min(save.level, MAXL)) { $('glEd').hidden = true; start(n); } };
+  const next = () => st.custom ? edOpen() : st.daily ? go(Math.min(save.level, MAXL)) : go(Math.min(MAXL, st.n + 1));
   document.addEventListener('keydown', e => {
     if (!on() || !st || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
     const k = e.key;
-    if (st.mode === 'won') { if ((k === 'Enter' || k === ' ') && st.dead > 40) { e.preventDefault(); go(Math.min(MAXL, st.n + 1)); } return; }
+    if (st.mode === 'edit') return;
+    if (st.mode === 'won') { if ((k === 'Enter' || k === ' ') && st.dead > 40) { e.preventDefault(); next(); } return; }
     if (k === 'p' || k === 'P' || k === 'Escape') { st.mode = st.mode === 'pause' ? 'play' : 'pause'; return; }
     if (st.mode === 'pause') { if (k === 'Enter') st.mode = 'play'; return; }
     if (GL_DIR[k]) { e.preventDefault(); move(k); return; }
     if (k === 'Backspace' || k === 'u' || k === 'U') { undo(); return; }
-    if (k === 'r' || k === 'R') { start(st.n); return; }
+    if (k === 'r' || k === 'R') { start(st.n, st.custom ? { L: st.L } : { daily: st.daily }); return; }
     if (k === 'h' || k === 'H') hint();
   });
   { const cv = $('glCanvas');  // à la souris ou au doigt : un clic du côté où glisser
-    cv.onpointerdown = e => { e.preventDefault(); if (!st) return; if (st.mode === 'won') { if (st.dead > 40) go(Math.min(MAXL, st.n + 1)); return; } if (st.mode === 'pause') { st.mode = 'play'; return; }
+    cv.onpointerdown = e => { e.preventDefault(); if (!st) return; if (st.mode === 'won') { if (st.dead > 40) next(); return; } if (st.mode === 'pause') { st.mode = 'play'; return; }
       const b = cv.getBoundingClientRect(), ox = Math.floor((COLS - st.L.w) / 2), oy = Math.floor((ROWS - st.L.h) / 2);
+      if (st.mode === 'edit') { edPut(Math.floor(((e.clientX - b.left) / b.width * W - ox * T) / T), Math.floor(((e.clientY - b.top) / b.height * H - Y0 - oy * T) / T)); return; }
       const x = (e.clientX - b.left) / b.width * W - (ox * T + st.x * T + 6), y = (e.clientY - b.top) / b.height * H - (Y0 + oy * T + st.y * T + 6);
       move(Math.abs(x) > Math.abs(y) ? (x > 0 ? 'ArrowRight' : 'ArrowLeft') : (y > 0 ? 'ArrowDown' : 'ArrowUp')); };
   }
-  $('glNew').onclick = () => { start(st.n); $('glNew').blur(); };
+  $('glNew').onclick = () => { if (st.mode === 'edit') return; start(st.n, st.custom ? { L: st.L } : { daily: st.daily }); $('glNew').blur(); };
+  $('glDaily').onclick = () => { $('glEd').hidden = true; start(st.n, { daily: true }); $('glDaily').blur(); };
+  $('glEdit').onclick = () => { edOpen(); $('glEdit').blur(); };
+  $('glTools').onclick = e => { const t = e.target.closest('[data-t]')?.dataset.t; if (t && ed) { ed.tool = t; edTools(); } };
+  const edCopy = () => JSON.parse(JSON.stringify(ed.L));
+  $('glTest').onclick = () => { $('glTest').blur(); if (!ed || ed.L.opt === Infinity) { beep(140, .1); return; } start(0, { L: edCopy() }); st.L.opt = ed.L.opt; };
+  $('glSave').onclick = () => { $('glSave').blur(); if (!ed || ed.L.opt === Infinity) { beep(140, .1); return; } const c = glCode(ed.L); if (!save.mine.includes(c)) save.mine = [c, ...save.mine].slice(0, 12); keep(); edTools(); $('glCode').value = c; };
+  $('glClear').onclick = () => { $('glClear').blur(); edOpen(edNew()); };
+  $('glCopy').onclick = () => { $('glCopy').blur(); if (!ed) return; const c = glCode(ed.L); $('glCode').value = c; navigator.clipboard?.writeText(c).catch(() => {}); };
+  $('glPaste').onclick = () => { $('glPaste').blur(); const L = glParse($('glCode').value); if (!L) { $('glCode').value = ''; $('glCode').placeholder = 'Code pas reconnu'; beep(140, .1); return; } edOpen(L); };
+  $('glMine').onchange = () => { const L = glParse(save.mine[+$('glMine').value]); if (L) edOpen(L); $('glMine').blur(); };
   $('glPrev').onclick = () => go(st.n - 1); $('glNext').onclick = () => go(st.n + 1);
   $('glFs').onclick = () => { $('glFs').blur(); try { if (document.fullscreenElement) document.exitFullscreen(); else $('glCanvas').parentElement.requestFullscreen?.().catch(() => {}); } catch {} };
   padKeys({ 3: 'h', 4: 'r' });
@@ -511,6 +559,9 @@ export default async function (ctx) {
     r = r && step(L, { ...r.S, x: 3 }, -1, 0); if (!r || r.S.x !== 2) bad.push('eau : ' + JSON.stringify(r?.S));
     r = step(L, { x: 0, y: 1, br: 0, pl: L.pl }, 1, 0); if (!r || r.S.x !== 1 || r.S.pl[0] !== 1 * 7 + 4) bad.push('tas : ' + JSON.stringify(r?.S));
     r = step(L, { x: 2, y: 2, br: 0, pl: [] }, -1, 0); if (!r || !r.tel || r.S.x !== 4 || r.S.y !== 2) bad.push('téléporteur : ' + JSON.stringify(r?.S));
+    { const L = edNew(); L.g[3][4] = '#'; L.g[5][2] = 's'; const c = glCode(L), P = glParse(c); if (!P || glCode(P) !== c) bad.push('code du niveau');
+      for (const z of ['G1:99x9:0,0,1,1:' + '.'.repeat(891), 'G1:3x3:0,0,0,0:.........', 'G1:3x3:0,0,2,2:..x......', '<b>']) if (glParse(z)) bad.push('code refusé : ' + z.slice(0, 12)); }
+    { const s = 20261123, A = makeLevel(45, s); levels.delete('d' + s); const B = makeLevel(45, s); if (!A || A.opt === Infinity || glCode(A) !== glCode(B)) bad.push('niveau du jour'); }
     Object.keys(save).forEach(k => delete save[k]); Object.assign(save, JSON.parse(keepS)); mute = false; st = keepSt;
     return bad.join(' | ') || 'ok';
   }

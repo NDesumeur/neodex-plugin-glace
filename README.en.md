@@ -4,6 +4,10 @@ A pixel-art puzzle: on ice, the penguin cannot stop. It slides to the next rock 
 
 *Version française : [README.md](README.md)*
 
+## Daily level and editor (new in 1.2.0)
+
+A new level every day, the same for everyone, with a day streak. The editor lets you place rocks, snow, the penguin and the flag, shows the shortest path right away, lets you try your level, keep it and share it with a code.
+
 ## Controls
 
 - **Arrows**: slide · **Backspace** or **U**: undo · **R**: restart · **H**: hint · **P**: pause.

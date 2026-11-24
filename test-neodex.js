@@ -19,6 +19,28 @@ module.exports = async ({ pj, sleep }) => {
   for (const m of await pj(`document.getElementById('glCanvas').__solve()`)) { await key(m); await sleep(800); }
   await sleep(500); if (!/niveau fini/.test(await label())) throw new Error('le premier niveau devait être fini');
   for (const n of [61, 66, 71]) await play(n, n === 61 ? 3 : n === 66 ? 2 : 2);
+  // le niveau du jour : le même à chaque départ, joué jusqu'au drapeau
+  const dl = []; for (let k = 0; k < 2; k++) { await pj(`document.getElementById('glDaily').click(), 0`); await sleep(300); dl.push(await C('return st.daily + ":" + JSON.stringify(st.L.g) + st.L.opt;')); }
+  if (dl[0] !== dl[1] || !dl[0].startsWith('true')) throw new Error('niveau du jour');
+  for (const m of await pj(`document.getElementById('glCanvas').__solve()`)) { await key(m); await sleep(700); }
+  await sleep(400); if (await C('return st.mode;') !== 'won') throw new Error('le niveau du jour devait être fini');
+  // l'éditeur : un rocher posé au clic, essayer le niveau et le finir, le garder, son code recopié puis rouvert
+  await pj(`document.getElementById('glEdit').click(), 0`); await sleep(200);
+  const tap = (x, y) => pj(`(() => { const c = document.getElementById('glCanvas'), r = c.getBoundingClientRect(), L = c.__gl.st().L, ox = Math.floor((20 - L.w) / 2), oy = Math.floor((10 - L.h) / 2);
+    c.onpointerdown({preventDefault() {}, clientX: r.left + ((ox + ${x}) * 12 + 6) / 240 * r.width, clientY: r.top + (16 + (oy + ${y}) * 12 + 6) / 136 * r.height}); return 0; })()`);
+  await tap(10, 1); await tap(1, 7); await pj(`document.querySelector('#glTools [data-t="F"]').click(), 0`); await tap(1, 6); await pj(`document.querySelector('#glTools [data-t="s"]').click(), 0`); await tap(6, 3);
+  const ed = await C('return st.mode + "|" + st.L.g[1][10] + st.L.g[7][1] + st.L.g[3][6] + "|" + st.L.ex + st.L.ey + "|" + st.L.opt;'); if (!/^edit\|##s\|16\|\d+$/.test(ed)) throw new Error('éditeur : ' + ed);
+  await sleep(200); await shot('editeur');
+  await pj(`document.getElementById('glTest').click(), 0`); await sleep(200);
+  if (!await C('return st.custom && st.mode === "play";')) throw new Error('essayer le niveau : ' + await C('return st.mode + "|" + st.custom + "|" + st.L.opt + "|" + document.getElementById("glEd").hidden;') + ' ' + await pj(`window.__e.join(' | ')`));
+  for (const m of await pj(`document.getElementById('glCanvas').__solve()`)) { await key(m); await sleep(700); }
+  await sleep(400); if (await C('return st.mode;') !== 'won') throw new Error('le niveau de l’éditeur devait se finir');
+  await C('st.dead = 99; return 0;'); await key('Enter'); await sleep(200); if (await C('return st.mode;') !== 'edit') throw new Error('retour à l’éditeur');
+  await pj(`document.getElementById('glSave').click(), 0`); await pj(`document.getElementById('glClear').click(), 0`);
+  const code = await pj(`document.getElementById('glCode').value`); await pj(`document.getElementById('glPaste').click(), 0`); await sleep(100);
+  const back = await C('return st.L.g[1][10] + st.L.g[3][6];'); if (back !== '#s' || !/^G1:12x8:/.test(code)) throw new Error('code du niveau : ' + code + ' → ' + back);
+  if (await pj(`document.getElementById('glMine').options.length`) < 2) throw new Error('mes niveaux');
+  await C('T.go(1); return 0;');
   const errs = await pj(`window.__e.join(' | ')`); if (errs) throw new Error('erreur : ' + errs);
   // plein écran, et la zone de jeu qui tient dans la fenêtre
   await pj(`document.fullscreenElement && document.exitFullscreen(), 0`); await sleep(200);
