@@ -1,9 +1,9 @@
 {
   "pluginId": "neodex.glace",
   "repo": "NDesumeur/neodex-plugin-glace",
-  "version": "1.1.1",
-  "sha256": "2b3502f8290bcaa879370c2defa1f1a1106497b4858603ea1136f33183935c03",
-  "approvedAt": "2026-11-19T23:26:41.309Z",
+  "version": "1.2.0",
+  "sha256": "ba4d0758fa54626d1285b6dd7095c276d44acc8faee66941ab047054c6d2a82b",
+  "approvedAt": "2026-11-24T15:56:17.750Z",
   "neobase": ">=4.0.0",
-  "signature": "fb/bJs527c0M6gyQLc2SP9xFuZEI6O16G97Co/BKnbz7AR7i6LGN+yeNRuWSt4EciGNa5nJaG5/KLTdAtQClAg=="
+  "signature": "AQFC3oq0YIugbfAQDsLL3j2Kwt17F2okk+N1o135BJ4YOvkKblek60bfLmNBaZFCQEjeVMzas6AxkzL042i6Bw=="
 }
