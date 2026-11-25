@@ -351,6 +351,9 @@ export default async function (ctx) {
     icons: [[/^RECOMMENCER/, 'play'], [/^RECORDS/, 'crown']] });
   const W = 240, H = 136, T = 12, COLS = 20, ROWS = 10, Y0 = 16, MAXL = 80;
   const save = { level: 1, stars: {}, moves: 0, ...(await doc('records')) };
+  // les trophées de NeoDex (3.4.8 et plus) : succès et records déclarés dans plugin.json ; sur un NeoDex plus ancien, rien ne se passe
+  const trophy = id => { ctx.games?.unlock(id).catch(() => {}); };
+  const trophyRecord = (id, v) => { if (v != null && Number.isFinite(+v)) ctx.games?.record(id, +v).catch(() => {}); };
   if (save.level === 60 && save.stars[60]) save.level = 61;  // les 20 nouveaux niveaux s'ouvrent à qui avait fini le 60
   const keep = () => mute ? 0 : folder.write('records', save).catch(() => {});  // rien n'est écrit pendant la vérification (mute), qui joue des niveaux pour de faux
   // un coup depuis l'état S = {x, y, br, pl} : le pingouin glisse jusqu'au rocher, au bord, à l'eau ou à un tas de neige (qu'il pousse) ;
@@ -508,6 +511,7 @@ export default async function (ctx) {
     if (st.tick % 15 === 0) g.canvas.setAttribute('aria-label', 'Glace, niveau ' + st.n + ' : pingouin en ' + (st.x + 1) + ', ' + (st.y + 1) + ', drapeau en ' + (L.ex + 1) + ', ' + (L.ey + 1) + ', ' + st.moves + ' coups' + (st.mode === 'won' ? ', niveau fini' : '') + '.');
   }
   function info() {
+    setTimeout(glTrophies);
     const stars = Object.values(save.stars).reduce((a, b) => a + b, 0);
     $('glStats').replaceChildren(...[['Niveau atteint', save.level], ['Étoiles', stars + ' / ' + MAXL * 3], ['Coups joués', save.moves], ['Niveau du jour', save.daily.last === day() ? 'fait ✓' : 'à faire'], ['Série de jours', (save.daily.last === day() || save.daily.last === day(1) ? save.daily.streak : 0) + ' (record ' + save.daily.best + ')']].flatMap(([a, c]) => [el('span', '', a), el('b', '', String(c))]));
   }
@@ -571,5 +575,12 @@ export default async function (ctx) {
   view.querySelector('#glCanvas').__gl = { st: () => st, check: glCheck, go: n => { save.level = Math.max(save.level, n); start(n); } };
   const STEP = 1000 / 60; let acc = 0, last = performance.now(), raf = 0;
   const frame = t => { if (!on()) { raf = 0; if (st.mode === 'play') st.mode = 'pause'; return; } raf = requestAnimationFrame(frame); acc += Math.min(200, t - last); last = t; while (acc >= STEP) { update(); acc -= STEP; } draw(); };
+  // les trophées, tirés des statistiques et des records gardés (aussi à l'ouverture : ce qui a été fait avant compte)
+  function glTrophies() {
+    const v = Object.values(save.stars), done = v.filter(Boolean).length, st = v.reduce((a, b) => a + b, 0), sig = [done, st, save.daily.best, save.mine.length].join(); if (sig === glTrophies.sig) return; glTrophies.sig = sig;
+    trophyRecord('etoiles', st || null);
+    if (done >= 1) trophy('premier'); if (done >= 20) trophy('n20'); if (done >= 60) trophy('n60'); if (done >= MAXL) trophy('n80'); if (st >= MAXL * 3) trophy('etoiles');
+    if (save.daily.best >= 7) trophy('jour7'); if (save.mine.length >= 1) trophy('createur');
+  }
   ctx.onOpen(() => { g ??= $('glCanvas').getContext('2d'); info(); last = performance.now(); if (!raf) raf = requestAnimationFrame(frame); });
 }

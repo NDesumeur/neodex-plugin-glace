@@ -127,5 +127,19 @@
  "vérification ok (80 niveaux) · niveaux 61, 66 et 71 finis (fissures, tas de neige, téléporteurs) · plein écran ·": "check ok (80 levels) · levels 61, 66 and 71 finished (cracks, snow piles, teleporters) · fullscreen ·",
  "px dans": "px in",
  "coup": "move",
- "Glace, un casse-tête en pixel art : sur la glace, le pingouin glisse jusqu'au prochain rocher. Trouve le chemin jusqu'au drapeau en le moins de coups possible. 80 niveaux tous vérifiés faisables, de la neige qui arrête net, puis de la glace fissurée qui casse après ton passage, des tas de neige à pousser et des téléporteurs ; des étoiles pour le plus court chemin, un indice si tu bloques. Clavier, souris ou manette, plein écran. Un niveau du jour et un éditeur pour créer et partager ses niveaux par un code.": "Glace, a pixel-art puzzle: on the ice, the penguin slides to the next rock. Find the way to the flag in as few moves as possible. 80 levels all checked solvable, snow that stops you dead, then cracked ice that breaks once you leave it, snow piles to push and teleporters; stars for the shortest path, a hint if you are stuck. Keyboard, mouse or gamepad, full screen. A daily level and an editor to build levels and share them with a code."
+ "Glace, un casse-tête en pixel art : sur la glace, le pingouin glisse jusqu'au prochain rocher. Trouve le chemin jusqu'au drapeau en le moins de coups possible. 80 niveaux tous vérifiés faisables, de la neige qui arrête net, puis de la glace fissurée qui casse après ton passage, des tas de neige à pousser et des téléporteurs ; des étoiles pour le plus court chemin, un indice si tu bloques. Clavier, souris ou manette, plein écran. Un niveau du jour et un éditeur pour créer et partager ses niveaux par un code.": "Glace, a pixel-art puzzle: on the ice, the penguin slides to the next rock. Find the way to the flag in as few moves as possible. 80 levels all checked solvable, snow that stops you dead, then cracked ice that breaks once you leave it, snow piles to push and teleporters; stars for the shortest path, a hint if you are stuck. Keyboard, mouse or gamepad, full screen. A daily level and an editor to build levels and share them with a code.",
+ "Ça glisse !": "Slippery!",
+ "Finir un premier niveau": "Finish your first level",
+ "Patineur": "Skater",
+ "Finir 20 niveaux": "Finish 20 levels",
+ "Roi de la banquise": "King of the ice floe",
+ "Finir 60 niveaux": "Finish 60 levels",
+ "Tous les glaçons": "Every ice cube",
+ "Finir les 80 niveaux": "Finish all 80 levels",
+ "Le plus court chemin": "The shortest path",
+ "Gagner 3 étoiles sur les 80 niveaux": "Earn 3 stars on all 80 levels",
+ "Une semaine sur la glace": "A week on the ice",
+ "Finir le niveau du jour 7 jours de suite": "Finish the level of the day 7 days in a row",
+ "Architecte du froid": "Architect of the cold",
+ "Enregistrer un niveau dans l'éditeur": "Save a level in the editor"
 }

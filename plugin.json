@@ -1,7 +1,7 @@
 {
   "id": "neodex.glace",
   "name": "Glace",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "author": "NDesumeur",
   "description": "Glace, un casse-tête en pixel art : sur la glace, le pingouin glisse jusqu'au prochain rocher. Trouve le chemin jusqu'au drapeau en le moins de coups possible. 80 niveaux tous vérifiés faisables, de la neige qui arrête net, puis de la glace fissurée qui casse après ton passage, des tas de neige à pousser et des téléporteurs ; des étoiles pour le plus court chemin, un indice si tu bloques. Clavier, souris ou manette, plein écran. Un niveau du jour et un éditeur pour créer et partager ses niveaux par un code.",
   "icon": "icon.png",
@@ -23,5 +23,51 @@
   "sdk": "2.1.0",
   "permissions": [
     "storage"
+  ],
+  "succes": [
+    {
+      "id": "premier",
+      "nom": "Ça glisse !",
+      "texte": "Finir un premier niveau"
+    },
+    {
+      "id": "n20",
+      "nom": "Patineur",
+      "texte": "Finir 20 niveaux"
+    },
+    {
+      "id": "n60",
+      "nom": "Roi de la banquise",
+      "texte": "Finir 60 niveaux"
+    },
+    {
+      "id": "n80",
+      "nom": "Tous les glaçons",
+      "texte": "Finir les 80 niveaux"
+    },
+    {
+      "id": "etoiles",
+      "nom": "Le plus court chemin",
+      "texte": "Gagner 3 étoiles sur les 80 niveaux",
+      "cache": true
+    },
+    {
+      "id": "jour7",
+      "nom": "Une semaine sur la glace",
+      "texte": "Finir le niveau du jour 7 jours de suite"
+    },
+    {
+      "id": "createur",
+      "nom": "Architecte du froid",
+      "texte": "Enregistrer un niveau dans l'éditeur"
+    }
+  ],
+  "records": [
+    {
+      "id": "etoiles",
+      "nom": "Étoiles",
+      "sens": "haut",
+      "format": "nombre"
+    }
   ]
 }
